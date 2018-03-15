@@ -7,15 +7,13 @@ from urllib.parse import urlparse, parse_qs
 import os
 import base64 as bs
 import sys
-from Crypto improve Random
-from Crypto.PublicKey import RSA
+import ssl
+
 
 class handle(BaseHTTPRequestHandler):
     conn = sql.connect('image.db')
     c = conn.cursor()
-    rand = Random.new().read
-    key = RSA.generate(1024, rand)
-    pub = key.publickey()
+
     def do_POST(self):
         """
         Takes in input uuid and image and stores it in an image database
@@ -51,7 +49,7 @@ class handle(BaseHTTPRequestHandler):
             uuid = (x['/?uuid'][0])
             q = x['q'][0]
             self.c.execute('select img from images where uuid=?', (uuid,))
-            img = self.key.decrypt(self.c.fetchone()[0])
+            img = self.c.fetchone()[0]
             img = np.asarray(Image.open(io.BytesIO(img)))
             self.wfile.write(f'{model(img,q)}'.encode('ascii'))
         elif list(x.keys()) == ['/?uuid']:
@@ -62,8 +60,7 @@ class handle(BaseHTTPRequestHandler):
                 self.wfile.write('True'.encode('ascii'))
             else:
                 self.wfile.write('False'.encode('ascii'))
-        else:
-            self.wfile.write(self.pub)
+
 
 def run(server_class=HTTPServer, handler_class=handle, port=81):
     """
@@ -71,6 +68,7 @@ def run(server_class=HTTPServer, handler_class=handle, port=81):
     """
     server_address = ('', port)
     httpd = server_class(server_address, handler_class)
+    httpd.socket = ssl.wrap_socket(httpd.socket, keyfile='server.key', certfile='server.crt',server_side=True,ssl_version=ssl.PROTOCOL_TLSv1_2)
     print('Starting server')
     httpd.serve_forever()
 
